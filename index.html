@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>Geiger Counter Data</title>
+</head>
+<body>
+  <h1>Live Radiation Monitoring</h1>
+  <div style="width:600px;height:400px;">
+    <canvas id="radiationChart"></canvas>
+  </div>
+
+  <script>
+    // Replace with your channel ID and read API key
+    const channelID = '2872097';
+    const readAPIKey = 'OYQGPL9J3OTYU2P3';
+    
+    // Create chart
+    const ctx = document.getElementById('radiationChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Radiation (µSv/h)',
+          data: [],
+          borderColor: 'rgb(255, 99, 132)',
+          tension: 0.1
+        }]
+      }
+    });
+    
+    // Function to fetch and update data
+    function updateChart() {
+      $.getJSON(`https://api.thingspeak.com/channels/${channelID}/feeds.json?api_key=${readAPIKey}&results=20`, function(data) {
+        const feeds = data.feeds;
+        chart.data.labels = feeds.map(feed => new Date(feed.created_at).toLocaleTimeString());
+        chart.data.datasets[0].data = feeds.map(feed => feed.field2);
+        chart.update();
+      });
+    }
+    
+    // Update initially and then every 30 seconds
+    updateChart();
+    setInterval(updateChart, 30000);
+  </script>
+</body>
+</html>
