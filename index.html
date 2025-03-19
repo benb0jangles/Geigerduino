@@ -34,7 +34,7 @@
     
     // Function to fetch and update data
     function updateChart() {
-      $.getJSON(`https://api.thingspeak.com/channels/${channelID}/feeds.json?api_key=${readAPIKey}&results=20`, function(data) {
+      $.getJSON(`https://api.thingspeak.com/channels/${channelID}/feeds.json?api_key=${readAPIKey}&days=7`, function(data) {
         const feeds = data.feeds;
         chart.data.labels = feeds.map(feed => new Date(feed.created_at).toLocaleTimeString());
         chart.data.datasets[0].data = feeds.map(feed => feed.field2);
