@@ -545,10 +545,16 @@
     let charts = {};
 
     const timeRanges = {
-        '1h':  { param: 'results=120',  label: '1 Hour' },
-        '24h': { param: 'days=1',       label: '24 Hours' },
-        '7d':  { param: 'days=7',       label: '7 Days' },
-        '30d': { param: 'days=30',      label: '30 Days' }
+        // minutes=60   → true 60-min window (results=120 was count-based;
+        //                 gaps in data could make "1 Hour" show several hours)
+        // days=1       → 2,880 pts at 30s intervals, well under 8,000 cap ✓
+        // days=7&average=60   → hourly averages = 168 pts (days=7 alone = 20,160
+        //                        pts, over ThingSpeak's 8,000 cap → only ~2.7 days shown)
+        // days=30&average=1440 → daily averages = 30 pts (avoids cap entirely)
+        '1h':  { param: 'minutes=60',              label: '1 Hour' },
+        '24h': { param: 'days=1',                  label: '24 Hours' },
+        '7d':  { param: 'days=7&average=60',        label: '7 Days' },
+        '30d': { param: 'days=30&average=1440',     label: '30 Days' }
     };
 
     document.addEventListener('DOMContentLoaded', () => {
