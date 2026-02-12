@@ -536,7 +536,7 @@
                 </div>
                 <div class="stat-minmax-divider"></div>
                 <div class="stat-minmax-col">
-                    <div class="stat-minmax-val" id="periodHigh" style="color:#FF8C00">--</div>
+                    <div class="stat-minmax-val" id="periodHigh" style="color:#888">--</div>
                     <div class="stat-minmax-lbl">▲ High</div>
                 </div>
             </div>
@@ -691,6 +691,7 @@
         document.getElementById('minMaxLabel').textContent = getAvgLabel().replace('Avg', 'Range');
         document.getElementById('periodLow').textContent  = minUSV !== null ? minUSV.toFixed(4) : '--';
         document.getElementById('periodHigh').textContent = maxUSV !== null ? maxUSV.toFixed(4) : '--';
+        document.getElementById('periodHigh').style.color = scaleColor(maxUSV);
 
         // Moving average datasets for trend lines
         const win     = getAvgWindow();
@@ -873,6 +874,15 @@
                 }
             }
         });
+    }
+
+    function scaleColor(usv) {
+        if (usv === null) return '#888';
+        if (usv < 0.3)  return '#4CAF50';  // green  — normal
+        if (usv < 1.0)  return '#FFD700';  // yellow — slightly elevated
+        if (usv < 5.0)  return '#FF8C00';  // orange — elevated
+        if (usv < 20.0) return '#FF4444';  // red    — high
+        return '#880000';                  // dark red — danger
     }
 
     function getAvgLabel() {
