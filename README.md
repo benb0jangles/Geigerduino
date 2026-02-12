@@ -66,7 +66,7 @@ The dashboard displays real-time CPM and µSv/h readings with interactive time-r
 MCU   : ESP32-C3 Super Mini
 Tube  : SBM-20 Geiger-Müller Tube
 Factor: 0.0057 µSv/h per CPM
-IoT   : ThingSpeak (field1 = CPM, field2 = µSv/h)
+IoT   : ioT Server (field1 = CPM, field2 = µSv/h)
 Power : USB-C
 ```
 
@@ -81,7 +81,7 @@ The ESP32-C3 reads pulses from the SBM-20 tube, calculates CPM and µSv/h, then 
 | `index.html` | Live dashboard — hosted via GitHub Pages |
 | `geigerduino_xiao_esp32c3/` | Firmware for XIAO ESP32-C3 |
 | `geigerduino_esp32c3_supermini/` | Firmware for ESP32-C3 Super Mini |
-| `geigerduino2_thingspeak/` | ThingSpeak variant firmware |
+| `geigerduino2_thingspeak/` | IoT server variant firmware |
 | `XIAO_ESP32C3_SETUP_REFERENCE.txt` | Wiring & board setup notes |
 
 ---
@@ -93,7 +93,7 @@ Open the firmware `.ino` file and set your credentials:
 ```cpp
 const char* ssid     = "YOUR_WIFI_SSID";
 const char* password = "YOUR_WIFI_PASSWORD";
-const char* apiKey   = "YOUR_THINGSPEAK_WRITE_KEY";
+const char* apiKey   = "YOUR_WRITE_API_KEY";
 ```
 
 In `index.html`, update the channel and read key:
