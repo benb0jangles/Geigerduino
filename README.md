@@ -74,37 +74,6 @@ The ESP32-C3 reads pulses from the SBM-20 tube, calculates CPM and µSv/h, then 
 
 ---
 
-## 🗂 Repository
-
-| File | Description |
-|------|-------------|
-| `index.html` | Live dashboard — hosted via GitHub Pages |
-| `geigerduino_xiao_esp32c3/` | Firmware for XIAO ESP32-C3 |
-| `geigerduino_esp32c3_supermini/` | Firmware for ESP32-C3 Super Mini |
-| `geigerduino2_thingspeak/` | IoT server variant firmware |
-| `XIAO_ESP32C3_SETUP_REFERENCE.txt` | Wiring & board setup notes |
-
----
-
-## ⚙️ Configuration
-
-Open the firmware `.ino` file and set your credentials:
-
-```cpp
-const char* ssid     = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
-const char* apiKey   = "YOUR_WRITE_API_KEY";
-```
-
-In `index.html`, update the channel and read key:
-
-```js
-const CHANNEL_ID   = 'YOUR_CHANNEL_ID';
-const READ_API_KEY = 'YOUR_READ_API_KEY';
-```
-
----
-
 <div align="center">
 
 *Natural background radiation (global average) ≈ 0.10–0.30 µSv/h*
