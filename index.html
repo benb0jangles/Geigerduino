@@ -488,6 +488,12 @@
             <div class="stat-value" id="dataPoints">--</div>
             <div class="stat-unit">in selected range</div>
         </div>
+        <div class="stat-card">
+            <span class="stat-icon">📈</span>
+            <div class="stat-label" id="avgUSVLabel">Period Average</div>
+            <div class="stat-value" id="avgUSV">--</div>
+            <div class="stat-unit">µSv/h</div>
+        </div>
     </div>
 
     <div class="scale-container">
@@ -605,12 +611,23 @@
         if (!isNaN(usv)) updateScaleMarker(usv);
 
         // Charts
-        const labels = feeds.map(f => new Date(f.created_at));
+        const labels  = feeds.map(f => new Date(f.created_at));
         const cpmData = feeds.map(f => parseFloat(f.field1) || null);
         const usvData = feeds.map(f => parseFloat(f.field2) || null);
 
-        buildChart('cpmChart', labels, cpmData, 'CPM', '#FFD700', 'rgba(255,215,0,0.08)');
-        buildChart('usvChart', labels, usvData, 'µSv/h', '#FFA500', 'rgba(255,165,0,0.08)', 6);
+        // Period average stat card
+        const validUSV = usvData.filter(v => v !== null && !isNaN(v));
+        const avgUSV   = validUSV.length > 0 ? validUSV.reduce((a, b) => a + b, 0) / validUSV.length : null;
+        document.getElementById('avgUSVLabel').textContent = getAvgLabel();
+        document.getElementById('avgUSV').textContent = avgUSV !== null ? avgUSV.toFixed(4) : '--';
+
+        // Moving average datasets for trend lines
+        const win     = getAvgWindow();
+        const cpmAvg  = computeMovingAverage(cpmData, win);
+        const usvAvg  = computeMovingAverage(usvData, win);
+
+        buildChart('cpmChart', labels, cpmData, cpmAvg, 'CPM',   '#FFD700', 'rgba(255,215,0,0.08)');
+        buildChart('usvChart', labels, usvData, usvAvg, 'µSv/h', '#FFA500', 'rgba(255,165,0,0.08)', 6);
 
         // Last update
         const ago = timeAgo(new Date(latest.created_at));
@@ -676,32 +693,58 @@
         document.getElementById('scaleMarker').style.left = Math.min(98, Math.max(1, pct)) + '%';
     }
 
-    function buildChart(id, labels, data, label, lineColor, fillColor, decimals = 1) {
+    function buildChart(id, labels, data, avgData, label, lineColor, fillColor, decimals = 1) {
         if (charts[id]) { charts[id].destroy(); }
         const ctx = document.getElementById(id).getContext('2d');
         charts[id] = new Chart(ctx, {
             type: 'line',
             data: {
                 labels,
-                datasets: [{
-                    label,
-                    data,
-                    borderColor: lineColor,
-                    backgroundColor: fillColor,
-                    borderWidth: 2,
-                    tension: 0.3,
-                    fill: true,
-                    pointRadius: data.length > 200 ? 0 : 2,
-                    pointHoverRadius: 5,
-                    spanGaps: true
-                }]
+                datasets: [
+                    {
+                        label,
+                        data,
+                        borderColor: lineColor,
+                        backgroundColor: fillColor,
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: data.length > 200 ? 0 : 2,
+                        pointHoverRadius: 5,
+                        spanGaps: true,
+                        order: 2
+                    },
+                    {
+                        label: getAvgLabel(),
+                        data: avgData,
+                        borderColor: 'rgba(255,255,255,0.55)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.5,
+                        borderDash: [6, 4],
+                        tension: 0.4,
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        spanGaps: true,
+                        order: 1
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: true,
                 interaction: { intersect: false, mode: 'index' },
                 plugins: {
-                    legend: { display: false },
+                    legend: {
+                        display: true,
+                        labels: {
+                            color: '#888',
+                            boxWidth: 16,
+                            font: { size: 11 },
+                            usePointStyle: true,
+                            pointStyle: 'line'
+                        }
+                    },
                     tooltip: {
                         backgroundColor: '#1a1a1a',
                         borderColor: 'rgba(255,215,0,0.3)',
@@ -711,7 +754,11 @@
                         padding: 12,
                         callbacks: {
                             title: ctx => new Date(ctx[0].label).toLocaleString(),
-                            label: ctx => ` ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(decimals) : 'N/A'} ${label}`
+                            label: ctx => {
+                                const v = ctx.parsed.y;
+                                const suffix = ctx.datasetIndex === 0 ? label : getAvgLabel();
+                                return ` ${v !== null && !isNaN(v) ? v.toFixed(decimals) : 'N/A'} ${suffix}`;
+                            }
                         }
                     }
                 },
@@ -737,6 +784,27 @@
                     }
                 }
             }
+        });
+    }
+
+    function getAvgLabel() {
+        const labels = { '1h': '1hr Avg', '24h': '24hr Avg', '7d': '7 Day Avg', '30d': '30 Day Avg' };
+        return labels[currentRange] || 'Average';
+    }
+
+    function getAvgWindow() {
+        // Window size tuned so the smoothing makes visual sense for each range's data density
+        const windows = { '1h': 10, '24h': 60, '7d': 6, '30d': 5 };
+        return windows[currentRange] || 10;
+    }
+
+    function computeMovingAverage(data, window) {
+        const half = Math.floor(window / 2);
+        return data.map((_, i) => {
+            const start = Math.max(0, i - half);
+            const end   = Math.min(data.length, i + half + 1);
+            const slice = data.slice(start, end).filter(v => v !== null && !isNaN(v));
+            return slice.length > 0 ? slice.reduce((a, b) => a + b, 0) / slice.length : null;
         });
     }
 
