@@ -284,6 +284,38 @@
             50% { opacity: 0.3; }
         }
 
+        /* ── MIN / MAX SPLIT CARD ── */
+        .stat-minmax-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+
+        .stat-minmax-col { text-align: center; }
+
+        .stat-minmax-val {
+            font-size: 1.55em;
+            font-weight: 700;
+            line-height: 1;
+            text-shadow: 0 0 12px currentColor;
+        }
+
+        .stat-minmax-lbl {
+            font-size: 0.7em;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+
+        .stat-minmax-divider {
+            width: 1px;
+            height: 36px;
+            background: var(--border);
+        }
+
         /* ── RADIATION SCALE ── */
         .scale-container {
             background: var(--bg-card);
@@ -494,6 +526,22 @@
             <div class="stat-value" id="avgUSV">--</div>
             <div class="stat-unit">µSv/h</div>
         </div>
+        <div class="stat-card">
+            <span class="stat-icon">↕</span>
+            <div class="stat-label" id="minMaxLabel">Period Range</div>
+            <div class="stat-minmax-row">
+                <div class="stat-minmax-col">
+                    <div class="stat-minmax-val" id="periodLow" style="color:#4CAF50">--</div>
+                    <div class="stat-minmax-lbl">▼ Low</div>
+                </div>
+                <div class="stat-minmax-divider"></div>
+                <div class="stat-minmax-col">
+                    <div class="stat-minmax-val" id="periodHigh" style="color:#FF8C00">--</div>
+                    <div class="stat-minmax-lbl">▲ High</div>
+                </div>
+            </div>
+            <div class="stat-unit">µSv/h</div>
+        </div>
     </div>
 
     <div class="scale-container">
@@ -549,6 +597,7 @@
 
     let currentRange = '1h';
     let charts = {};
+    let countdownTimer = null;
 
     const timeRanges = {
         // minutes=60   → true 60-min window (results=120 was count-based;
@@ -574,10 +623,11 @@
         });
         document.getElementById('refreshBtn').addEventListener('click', loadData);
         loadData();
-        setInterval(loadData, 30000);
     });
 
     async function loadData() {
+        clearInterval(countdownTimer);
+        document.getElementById('refreshBtn').textContent = '↻ Loading…';
         document.getElementById('lastUpdate').textContent = 'Loading...';
         const { param } = timeRanges[currentRange];
         const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${READ_API_KEY}&${param}`;
@@ -591,6 +641,22 @@
             document.getElementById('lastUpdate').textContent = 'Error loading data';
             console.error(err);
         }
+        startCountdown();
+    }
+
+    function startCountdown() {
+        let secs = 30;
+        const btn = document.getElementById('refreshBtn');
+        btn.textContent = `↻ ${secs}s`;
+        countdownTimer = setInterval(() => {
+            secs--;
+            if (secs <= 0) {
+                clearInterval(countdownTimer);
+                loadData();
+            } else {
+                btn.textContent = `↻ ${secs}s`;
+            }
+        }, 1000);
     }
 
     function processData(feeds) {
@@ -615,11 +681,16 @@
         const cpmData = feeds.map(f => parseFloat(f.field1) || null);
         const usvData = feeds.map(f => parseFloat(f.field2) || null);
 
-        // Period average stat card
+        // Period average / min / max stat cards
         const validUSV = usvData.filter(v => v !== null && !isNaN(v));
         const avgUSV   = validUSV.length > 0 ? validUSV.reduce((a, b) => a + b, 0) / validUSV.length : null;
+        const minUSV   = validUSV.length > 0 ? Math.min(...validUSV) : null;
+        const maxUSV   = validUSV.length > 0 ? Math.max(...validUSV) : null;
         document.getElementById('avgUSVLabel').textContent = getAvgLabel();
-        document.getElementById('avgUSV').textContent = avgUSV !== null ? avgUSV.toFixed(4) : '--';
+        document.getElementById('avgUSV').textContent  = avgUSV !== null ? avgUSV.toFixed(4) : '--';
+        document.getElementById('minMaxLabel').textContent = getAvgLabel().replace('Avg', 'Range');
+        document.getElementById('periodLow').textContent  = minUSV !== null ? minUSV.toFixed(4) : '--';
+        document.getElementById('periodHigh').textContent = maxUSV !== null ? maxUSV.toFixed(4) : '--';
 
         // Moving average datasets for trend lines
         const win     = getAvgWindow();
@@ -627,7 +698,7 @@
         const usvAvg  = computeMovingAverage(usvData, win);
 
         buildChart('cpmChart', labels, cpmData, cpmAvg, 'CPM',   '#FFD700', 'rgba(255,215,0,0.08)');
-        buildChart('usvChart', labels, usvData, usvAvg, 'µSv/h', '#FFA500', 'rgba(255,165,0,0.08)', 6);
+        buildChart('usvChart', labels, usvData, usvAvg, 'µSv/h', '#FFA500', 'rgba(255,165,0,0.08)', 6, 0.30);
 
         // Last update
         const ago = timeAgo(new Date(latest.created_at));
@@ -693,43 +764,59 @@
         document.getElementById('scaleMarker').style.left = Math.min(98, Math.max(1, pct)) + '%';
     }
 
-    function buildChart(id, labels, data, avgData, label, lineColor, fillColor, decimals = 1) {
+    function buildChart(id, labels, data, avgData, label, lineColor, fillColor, decimals = 1, thresholdVal = null) {
         if (charts[id]) { charts[id].destroy(); }
         const ctx = document.getElementById(id).getContext('2d');
+
+        const datasets = [
+            {
+                label,
+                data,
+                borderColor: lineColor,
+                backgroundColor: fillColor,
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true,
+                pointRadius: data.length > 200 ? 0 : 2,
+                pointHoverRadius: 5,
+                spanGaps: true,
+                order: 2
+            },
+            {
+                label: getAvgLabel(),
+                data: avgData,
+                borderColor: 'rgba(255,255,255,0.55)',
+                backgroundColor: 'transparent',
+                borderWidth: 1.5,
+                borderDash: [6, 4],
+                tension: 0.4,
+                fill: false,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                spanGaps: true,
+                order: 1
+            }
+        ];
+
+        if (thresholdVal !== null) {
+            datasets.push({
+                label: `Normal limit (${thresholdVal} µSv/h)`,
+                data: labels.map(() => thresholdVal),
+                borderColor: 'rgba(76,175,80,0.7)',
+                backgroundColor: 'transparent',
+                borderWidth: 1.5,
+                borderDash: [4, 4],
+                fill: false,
+                pointRadius: 0,
+                pointHoverRadius: 0,
+                spanGaps: true,
+                order: 3
+            });
+        }
+
         charts[id] = new Chart(ctx, {
             type: 'line',
-            data: {
-                labels,
-                datasets: [
-                    {
-                        label,
-                        data,
-                        borderColor: lineColor,
-                        backgroundColor: fillColor,
-                        borderWidth: 2,
-                        tension: 0.3,
-                        fill: true,
-                        pointRadius: data.length > 200 ? 0 : 2,
-                        pointHoverRadius: 5,
-                        spanGaps: true,
-                        order: 2
-                    },
-                    {
-                        label: getAvgLabel(),
-                        data: avgData,
-                        borderColor: 'rgba(255,255,255,0.55)',
-                        backgroundColor: 'transparent',
-                        borderWidth: 1.5,
-                        borderDash: [6, 4],
-                        tension: 0.4,
-                        fill: false,
-                        pointRadius: 0,
-                        pointHoverRadius: 4,
-                        spanGaps: true,
-                        order: 1
-                    }
-                ]
-            },
+            data: { labels, datasets },
             options: {
                 responsive: true,
                 maintainAspectRatio: true,
@@ -755,6 +842,7 @@
                         callbacks: {
                             title: ctx => new Date(ctx[0].label).toLocaleString(),
                             label: ctx => {
+                                if (thresholdVal !== null && ctx.datasetIndex === 2) return null;
                                 const v = ctx.parsed.y;
                                 const suffix = ctx.datasetIndex === 0 ? label : getAvgLabel();
                                 return ` ${v !== null && !isNaN(v) ? v.toFixed(decimals) : 'N/A'} ${suffix}`;
